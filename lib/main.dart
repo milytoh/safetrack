@@ -8,6 +8,7 @@ import 'features/auth/screens/reg_permissions_screen.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/services/auth_service.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
+import 'core/api/api_client.dart';
 
 void main() {
   runApp(const SafeTrackApp());
@@ -54,25 +55,21 @@ class _AuthFlowState extends State<AuthFlow> {
     try {
       final res = await AuthService.login(phone: phone, password: password);
 
+      final contactsRes = await ApiClient.request('/contacts');
+
+      final contacts = contactsRes['contacts'] is List
+          ? (contactsRes['contacts'] as List)
+                .map<Map<String, String>>(
+                  (contact) => {
+                    'name': '${contact['name'] ?? ''}',
+                    'phone': '${contact['phone'] ?? ''}',
+                    'relationship': '${contact['relationship'] ?? ''}',
+                  },
+                )
+                .toList()
+          : <Map<String, String>>[];
+
       if (!mounted) return;
-
-      debugPrint('LOGIN RESPONSE: $res');
-
-      final user = res['user'];
-
-      List<Map<String, String>> contacts = [];
-
-      if (user != null && user['contacts'] is List) {
-        contacts = (user['contacts'] as List)
-            .map<Map<String, String>>(
-              (contact) => {
-                'name': '${contact['name'] ?? ''}',
-                'phone': '${contact['phone'] ?? ''}',
-                'relationship': '${contact['relationship'] ?? ''}',
-              },
-            )
-            .toList();
-      }
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -97,7 +94,7 @@ class _AuthFlowState extends State<AuthFlow> {
                 (route) => false,
               );
             },
-            onTriggerSOS: () {
+            onTriggerSOS: (triggerType) {
               debugPrint('SOS TRIGGERED');
             },
             onOfflineSms: () {
@@ -170,11 +167,14 @@ class _AuthFlowState extends State<AuthFlow> {
                 (route) => false,
               );
             },
-            onTriggerSOS: () {
+            onTriggerSOS: (triggerType) {
               debugPrint('SOS triggered');
             },
             onStartCheckin: (seconds) {
               debugPrint('Check-in started: $seconds seconds');
+            },
+            onOfflineSms: () {
+              debugPrint('Offline SMS clicked');
             },
           ),
         ),

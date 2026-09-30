@@ -5,6 +5,9 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import 'checkin_active_screen.dart';
+
+import '../../../services/alert_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -23,7 +26,7 @@ class DashboardScreen extends StatefulWidget {
   final VoidCallback onSettings;
   final VoidCallback onHistory;
   final VoidCallback onLogout;
-  final VoidCallback onTriggerSOS;
+  final void Function(String triggerType) onTriggerSOS;
   final VoidCallback onOfflineSms;
 
   final void Function(int seconds) onStartCheckin;
@@ -37,6 +40,43 @@ class _DashboardScreenState extends State<DashboardScreen>
   int hours = 0;
   int minutes = 1;
   int seconds = 0;
+
+  final TextEditingController _hoursController = TextEditingController(
+    text: '0',
+  );
+
+  final TextEditingController _minutesController = TextEditingController(
+    text: '1',
+  );
+
+  final TextEditingController _secondsController = TextEditingController(
+    text: '0',
+  );
+
+  Future<void> _triggerSOS(String triggerType) async {
+    try {
+      final location = _currentPosition == null
+          ? null
+          : {
+              'lat': _currentPosition!.latitude,
+              'lng': _currentPosition!.longitude,
+              'accuracy': _currentPosition!.accuracy,
+            };
+
+      debugPrint('Sending SOS...');
+      debugPrint('Trigger type: $triggerType');
+      debugPrint('Location: $location');
+
+      final res = await AlertService.triggerSOS(
+        triggerType: triggerType,
+        location: location,
+      );
+
+      debugPrint('SOS RESPONSE: $res');
+    } catch (e) {
+      debugPrint('SOS ERROR: $e');
+    }
+  }
 
   Position? _currentPosition;
   bool gpsActive = false;
@@ -53,6 +93,36 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   static const int _holdDurationMs = 3000;
   late AnimationController _sosAnimationController;
+
+  void _startCheckin(int totalSeconds) {
+    if (totalSeconds <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a check-in duration.')),
+      );
+
+      return;
+    }
+
+    final expiresAt = DateTime.now().add(Duration(seconds: totalSeconds));
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CheckinActiveScreen(
+          expiresAt: expiresAt,
+          onCheckIn: () {
+            Navigator.of(context).pop();
+
+            debugPrint('User checked in safely');
+          },
+          onExpire: () {
+            // Navigator.of(context).pop();
+
+            debugPrint('CHECK-IN EXPIRED — trigger emergency alert');
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -150,7 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
         _sosPressStart = null;
 
-        widget.onTriggerSOS();
+        await _triggerSOS('manual_hold');
       }
     });
   }
@@ -199,6 +269,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void dispose() {
     _sosTimer?.cancel();
+
+    _hoursController.dispose();
+    _minutesController.dispose();
+    _secondsController.dispose();
+
     super.dispose();
   }
 
@@ -554,15 +629,19 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [
               _timeField('Hours', hours, 23, (value) {
                 setState(() => hours = value);
-              }),
+              }, _hoursController),
+
               const SizedBox(width: 8),
+
               _timeField('Minutes', minutes, 59, (value) {
                 setState(() => minutes = value);
-              }),
+              }, _minutesController),
+
               const SizedBox(width: 8),
+
               _timeField('Seconds', seconds, 59, (value) {
                 setState(() => seconds = value);
-              }),
+              }, _secondsController),
             ],
           ),
 
@@ -589,7 +668,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               onPressed: () {
                 final total = hours * 3600 + minutes * 60 + seconds;
 
-                widget.onStartCheckin(total);
+                _startCheckin(total);
               },
               child: const Text('Start Check-in Timer'),
             ),
@@ -787,6 +866,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     int value,
     int max,
     ValueChanged<int> onChanged,
+    TextEditingController controller,
   ) {
     return Expanded(
       child: Column(
@@ -799,9 +879,11 @@ class _DashboardScreenState extends State<DashboardScreen>
               fontWeight: FontWeight.w500,
             ),
           ),
+
           const SizedBox(height: 6),
+
           TextFormField(
-            initialValue: value.toString(),
+            controller: controller,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             style: AppTextStyles.bodyMedium,
@@ -811,6 +893,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             onChanged: (text) {
               final parsed = int.tryParse(text) ?? 0;
               final next = parsed.clamp(0, max);
+
               onChanged(next);
             },
           ),
@@ -827,6 +910,10 @@ class _DashboardScreenState extends State<DashboardScreen>
             hours = h;
             minutes = m;
             seconds = s;
+
+            _hoursController.text = h.toString();
+            _minutesController.text = m.toString();
+            _secondsController.text = s.toString();
           });
         },
         style: OutlinedButton.styleFrom(

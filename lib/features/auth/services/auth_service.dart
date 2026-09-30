@@ -45,4 +45,23 @@ class AuthService {
   static Future<void> logout() async {
     await TokenStorage.clear();
   }
+
+  /// Get trusted contacts for the current user
+  static Future<List<Map<String, String>>> getContacts() async {
+    final res = await ApiClient.request('/contacts');
+
+    final contacts = res['contacts'];
+
+    if (contacts is! List) {
+      return [];
+    }
+
+    return contacts.map<Map<String, String>>((contact) {
+      return {
+        'name': contact['name']?.toString() ?? '',
+        'relationship': contact['relationship']?.toString() ?? '',
+        'phone': contact['phone']?.toString() ?? '',
+      };
+    }).toList();
+  }
 }
