@@ -11,7 +11,7 @@ class RegContactsScreen extends StatefulWidget {
   });
 
   final VoidCallback onBack;
-  final VoidCallback onNext;
+  final void Function(List<Map<String, String>> contacts) onNext;
 
   @override
   State<RegContactsScreen> createState() => _RegContactsScreenState();
@@ -63,7 +63,17 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
       }
     }
 
-    widget.onNext();
+    final contacts = <Map<String, String>>[];
+
+    for (int i = 0; i < 5; i++) {
+      contacts.add({
+        'name': _nameControllers[i].text.trim(),
+        'phone': _phoneControllers[i].text.trim(),
+        'relationship': _relationshipControllers[i].text.trim(),
+      });
+    }
+
+    widget.onNext(contacts);
   }
 
   Widget _field({
@@ -110,26 +120,20 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
               letterSpacing: 0.7,
             ),
           ),
-
           const SizedBox(height: 12),
-
           _field(
             label: 'Full name',
             hint: 'e.g. Ngozi Okafor',
             controller: _nameControllers[index],
           ),
-
           const SizedBox(height: 12),
-
           _field(
             label: 'Phone number',
             hint: '+234 801 234 5678',
             controller: _phoneControllers[index],
             keyboardType: TextInputType.phone,
           ),
-
           const SizedBox(height: 12),
-
           _field(
             label: 'Relationship',
             hint: 'Sister / Friend / Colleague',
@@ -147,7 +151,6 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               decoration: const BoxDecoration(
@@ -178,7 +181,6 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
                       ),
                     ),
                   ),
-
                   Expanded(
                     child: Text(
                       'Trusted Contacts',
@@ -189,7 +191,6 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(
                     width: 64,
                     child: Align(
@@ -201,7 +202,6 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
               ),
             ),
 
-            // Progress
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 20),
               child: Row(
@@ -216,7 +216,6 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
               ),
             ),
 
-            // Alert
             Container(
               margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -250,7 +249,6 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
               ),
             ),
 
-            // Contacts
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -264,7 +262,6 @@ class _RegContactsScreenState extends State<RegContactsScreen> {
               ),
             ),
 
-            // Continue
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
               child: SizedBox(
