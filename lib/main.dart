@@ -7,6 +7,7 @@ import 'features/auth/screens/reg_profile_screen.dart';
 import 'features/auth/screens/reg_permissions_screen.dart';
 import 'features/auth/screens/splash_screen.dart';
 import 'features/auth/services/auth_service.dart';
+import 'features/dashboard/screens/dashboard_screen.dart';
 
 void main() {
   runApp(const SafeTrackApp());
@@ -43,47 +44,8 @@ class _AuthFlowState extends State<AuthFlow> {
 
   // ─────────────────────────────────────────────
   // LOGIN
-  // ─────────────────────────────────────────────
-  // Future<void> _handleLogin(String phone, String password) async {
-  //   setState(() {
-  //     _busy = true;
-  //     _error = null;
-  //   });
-
-  //   try {
-  //     print(phone);
-  //     final res = await AuthService.login(phone: phone, password: password);
-
-  //     // TODO: Later we will check if user is verified and go to OTP if needed
-  //     // For now go to a temporary success screen
-  //     if (!mounted) return;
-
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: Text('Welcome back, ${res['user']?['name'] ?? 'User'}'),
-  //       ),
-  //     );
-
-  //     // Temporary: just show success. We will add Dashboard later.
-  //     debugPrint('Login success: $res');
-  //   } catch (e) {
-  //     setState(() {
-  //       _error = e.toString();
-  //     });
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() => _busy = false);
-  //     }
-  //   }
-  // }
 
   Future<void> _handleLogin(String phone, String password) async {
-    // ScaffoldMessenger.of(context).showSnackBar(
-    //   const SnackBar(
-    //     content: Text('Login button is working — calling backend...'),
-    //   ),
-    // );
-
     setState(() {
       _busy = true;
       _error = null;
@@ -94,15 +56,59 @@ class _AuthFlowState extends State<AuthFlow> {
 
       if (!mounted) return;
 
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: Text(
-      //       'Login API successful: ${res['user']?['name'] ?? 'User'}',
-      //     ),
-      //   ),
-      // );
-
       debugPrint('LOGIN RESPONSE: $res');
+
+      final user = res['user'];
+
+      List<Map<String, String>> contacts = [];
+
+      if (user != null && user['contacts'] is List) {
+        contacts = (user['contacts'] as List)
+            .map<Map<String, String>>(
+              (contact) => {
+                'name': '${contact['name'] ?? ''}',
+                'phone': '${contact['phone'] ?? ''}',
+                'relationship': '${contact['relationship'] ?? ''}',
+              },
+            )
+            .toList();
+      }
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => DashboardScreen(
+            contacts: contacts,
+            onSettings: () {
+              debugPrint('Settings clicked');
+            },
+            onHistory: () {
+              debugPrint('History clicked');
+            },
+            onLogout: () async {
+              await AuthService.logout();
+
+              if (!mounted) return;
+
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      SplashScreen(onLogin: () {}, onRegister: () {}),
+                ),
+                (route) => false,
+              );
+            },
+            onTriggerSOS: () {
+              debugPrint('SOS TRIGGERED');
+            },
+            onOfflineSms: () {
+              debugPrint('Offline SMS clicked');
+            },
+            onStartCheckin: (seconds) {
+              debugPrint('Check-in started: $seconds seconds');
+            },
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -123,9 +129,13 @@ class _AuthFlowState extends State<AuthFlow> {
   // REGISTER
   // ─────────────────────────────────────────────
   Future<void> _finishRegistration() async {
-    if (_profileData == null || _contactsData == null) return;
+    if (_profileData == null || _contactsData == null) {
+      return;
+    }
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+    });
 
     try {
       final res = await AuthService.register(
@@ -135,24 +145,53 @@ class _AuthFlowState extends State<AuthFlow> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account created — check your phone for the OTP code'),
+      debugPrint('REGISTER RESPONSE: $res');
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => DashboardScreen(
+            contacts: _contactsData!,
+            onSettings: () {
+              debugPrint('Settings clicked');
+            },
+            onHistory: () {
+              debugPrint('History clicked');
+            },
+            onLogout: () async {
+              await AuthService.logout();
+
+              if (!mounted) return;
+
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      SplashScreen(onLogin: () {}, onRegister: () {}),
+                ),
+                (route) => false,
+              );
+            },
+            onTriggerSOS: () {
+              debugPrint('SOS triggered');
+            },
+            onStartCheckin: (seconds) {
+              debugPrint('Check-in started: $seconds seconds');
+            },
+          ),
         ),
+        (route) => false,
       );
-
-      debugPrint('Register success: $res');
-
-      // TODO: Navigate to OTP screen next
-      // For now just go back to splash
-      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+          .showSnackBar(SnackBar(content: Text('REGISTRATION FAILED: $e')));
+
+      debugPrint('REGISTER ERROR: $e');
     } finally {
       if (mounted) {
-        setState(() => _busy = false);
+        setState(() {
+          _busy = false;
+        });
       }
     }
   }
