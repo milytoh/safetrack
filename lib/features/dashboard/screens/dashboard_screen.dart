@@ -9,6 +9,8 @@ import 'checkin_active_screen.dart';
 
 import '../../../services/alert_service.dart';
 
+import 'active_alert_screen.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
@@ -73,8 +75,52 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
 
       debugPrint('SOS RESPONSE: $res');
+
+      if (!mounted) return;
+
+      final alert = res['alert'];
+
+      debugPrint('TRACK TOKEN: ${alert['trackToken']}');
+
+      if (alert is! Map) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('SOS triggered, but alert data was not returned.'),
+          ),
+        );
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ActiveAlertScreen(
+            alert: Map<String, dynamic>.from(alert),
+            position: _currentPosition,
+            elapsed: '00:00',
+            recording: false,
+            chunksSent: 0,
+            trackLink: '',
+            onResolve: () {
+              Navigator.of(context).pop();
+
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Emergency ended.')));
+            },
+          ),
+        ),
+      );
     } catch (e) {
       debugPrint('SOS ERROR: $e');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to trigger SOS: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -115,8 +161,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             debugPrint('User checked in safely');
           },
           onExpire: () {
-            // Navigator.of(context).pop();
-
+            Navigator.of(context).pop();
+            _triggerSOS('checkin_timeout');
             debugPrint('CHECK-IN EXPIRED — trigger emergency alert');
           },
         ),
@@ -195,7 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     _sosAnimationController.repeat();
 
-    _sosTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+    _sosTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) async {
       if (!mounted || _sosPressStart == null) {
         timer.cancel();
         return;
