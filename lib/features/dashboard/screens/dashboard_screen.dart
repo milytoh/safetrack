@@ -80,14 +80,14 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       final alert = res['alert'];
 
-      debugPrint('TRACK TOKEN: ${alert['trackToken']}');
-
       if (alert is! Map) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('SOS triggered, but alert data was not returned.'),
           ),
         );
+
+        debugPrint('TRACK TOKEN: ${alert['trackToken']}');
         return;
       }
 
@@ -96,7 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           builder: (_) => ActiveAlertScreen(
             alert: Map<String, dynamic>.from(alert),
             position: _currentPosition,
-            elapsed: '00:00',
+
             recording: false,
             chunksSent: 0,
             trackLink: '',

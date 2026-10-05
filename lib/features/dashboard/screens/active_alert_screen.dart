@@ -4,12 +4,14 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../../core/theme/app_colors.dart';
 
+import 'dart:async';
+
 class ActiveAlertScreen extends StatelessWidget {
   const ActiveAlertScreen({
     super.key,
     required this.alert,
     required this.position,
-    required this.elapsed,
+
     required this.recording,
     required this.chunksSent,
     required this.trackLink,
@@ -18,7 +20,7 @@ class ActiveAlertScreen extends StatelessWidget {
 
   final Map<String, dynamic> alert;
   final Position? position;
-  final String elapsed;
+
   final bool recording;
   final int chunksSent;
   final String trackLink;
@@ -29,6 +31,14 @@ class ActiveAlertScreen extends StatelessWidget {
     final notifiedContacts = alert['notifiedContacts'] is List
         ? alert['notifiedContacts'] as List
         : <dynamic>[];
+
+    final rawTriggeredAt = alert['triggeredAt'];
+
+    final startedAt = rawTriggeredAt is String
+        ? DateTime.tryParse(rawTriggeredAt) ?? DateTime.now()
+        : rawTriggeredAt is DateTime
+        ? rawTriggeredAt
+        : DateTime.now();
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -69,10 +79,7 @@ class ActiveAlertScreen extends StatelessWidget {
                     ],
                   ),
                   const Spacer(),
-                  Text(
-                    elapsed,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
+                  _ElapsedTimer(startedAt: startedAt),
                 ],
               ),
             ),
@@ -539,5 +546,50 @@ class _GridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return false;
+  }
+}
+
+class _ElapsedTimer extends StatefulWidget {
+  const _ElapsedTimer({required this.startedAt});
+
+  final DateTime startedAt;
+
+  @override
+  State<_ElapsedTimer> createState() => _ElapsedTimerState();
+}
+
+class _ElapsedTimerState extends State<_ElapsedTimer> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final difference = DateTime.now().difference(widget.startedAt);
+    final duration = difference.isNegative ? Duration.zero : difference;
+
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+
+    return Text(
+      '${minutes.toString().padLeft(2, '0')}:'
+      '${seconds.toString().padLeft(2, '0')}',
+      style: const TextStyle(color: Colors.white, fontSize: 12),
+    );
   }
 }
