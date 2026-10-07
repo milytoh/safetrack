@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.safe_track"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -11,6 +11,8 @@ import '../../../services/alert_service.dart';
 
 import 'active_alert_screen.dart';
 
+import 'package:permission_handler/permission_handler.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
@@ -91,18 +93,19 @@ class _DashboardScreenState extends State<DashboardScreen>
         return;
       }
 
+      _positionSub?.cancel();
+      _positionSub = null;
+
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ActiveAlertScreen(
             alert: Map<String, dynamic>.from(alert),
             position: _currentPosition,
-
-            recording: false,
-            chunksSent: 0,
-            trackLink: '',
+            address: '', // ← NEW: reverse-geocoding comes later
+            recording: false, // ← TODO: wire up audio recorder
+            chunksSent: 0, // ← TODO: wire up audio recorder
             onResolve: () {
               Navigator.of(context).pop();
-
               ScaffoldMessenger.of(
                 context,
               ).showSnackBar(const SnackBar(content: Text('Emergency ended.')));
@@ -178,56 +181,136 @@ class _DashboardScreenState extends State<DashboardScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-    _initializeLocation();
+    _requestPermissions();
   }
 
-  Future<void> _initializeLocation() async {
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  StreamSubscription<Position>? _positionSub;
+  Future<void> _requestPermissions() async {
+    // ─── 1. Location ─────────────────────────────────────────────────
+    var locStatus = await Permission.locationWhenInUse.status;
 
-      if (!serviceEnabled) {
-        if (!mounted) return;
+    if (locStatus.isDenied) {
+      debugPrint('📍 Requesting location permission…');
+      locStatus = await Permission.locationWhenInUse.request();
+    }
 
-        setState(() {
-          gpsActive = false;
-        });
-
-        return;
+    if (locStatus.isGranted) {
+      debugPrint('📍 Location permission granted');
+      _startLocationStream();
+    } else if (locStatus.isPermanentlyDenied) {
+      debugPrint('📍 Location permanently denied');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Location permission is off. Tap to open Settings.',
+            ),
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(label: 'Open', onPressed: openAppSettings),
+          ),
+        );
+        setState(() => gpsActive = false);
       }
+    } else {
+      debugPrint('📍 Location permission denied');
+      if (mounted) setState(() => gpsActive = false);
+    }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+    // ─── 2. Microphone ───────────────────────────────────────────────
+    var micStatus = await Permission.microphone.status;
 
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+    if (micStatus.isDenied) {
+      debugPrint('🎤 Requesting microphone permission…');
+      micStatus = await Permission.microphone.request();
+    }
+
+    if (micStatus.isGranted) {
+      debugPrint('🎤 Microphone permission granted');
+    } else if (micStatus.isPermanentlyDenied) {
+      debugPrint('🎤 Microphone permanently denied');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Microphone permission is off. Tap to open Settings.',
+            ),
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(label: 'Open', onPressed: openAppSettings),
+          ),
+        );
       }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        if (!mounted) return;
-
-        setState(() {
-          gpsActive = false;
-        });
-
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition();
-
-      if (!mounted) return;
-
-      setState(() {
-        _currentPosition = position;
-        gpsActive = true;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        gpsActive = false;
-      });
+    } else {
+      debugPrint('🎤 Microphone permission denied');
     }
   }
+
+  /// Starts the GPS stream only after location permission is confirmed.
+  void _startLocationStream() {
+    _positionSub?.cancel();
+    _positionSub =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 5,
+          ),
+        ).listen(
+          (position) {
+            debugPrint(
+              '📍 DASHBOARD POSITION: ${position.latitude}, ${position.longitude}',
+            );
+            if (!mounted) return;
+            setState(() {
+              _currentPosition = position;
+              gpsActive = true;
+            });
+          },
+          onError: (e) {
+            debugPrint('📍 DASHBOARD POSITION ERROR: $e');
+            if (mounted) setState(() => gpsActive = false);
+          },
+        );
+  }
+  // Future<void> _initializeLocation() async {
+  //   try {
+  //     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  //     if (!serviceEnabled) {
+  //       if (mounted) setState(() => gpsActive = false);
+  //       return;
+  //     }
+
+  //     var permission = await Geolocator.checkPermission();
+  //     if (permission == LocationPermission.denied) {
+  //       permission = await Geolocator.requestPermission();
+  //     }
+  //     if (permission == LocationPermission.denied ||
+  //         permission == LocationPermission.deniedForever) {
+  //       if (mounted) setState(() => gpsActive = false);
+  //       return;
+  //     }
+
+  //     // Continuous updates — mirrors React's watchPosition.
+  //     _positionSub =
+  //         Geolocator.getPositionStream(
+  //           locationSettings: const LocationSettings(
+  //             accuracy: LocationAccuracy.high,
+  //             distanceFilter: 5,
+  //           ),
+  //         ).listen(
+  //           (position) {
+  //             if (!mounted) return;
+  //             setState(() {
+  //               _currentPosition = position;
+  //               gpsActive = true;
+  //             });
+  //           },
+  //           onError: (_) {
+  //             if (mounted) setState(() => gpsActive = false);
+  //           },
+  //         );
+  //   } catch (e) {
+  //     if (mounted) setState(() => gpsActive = false);
+  //   }
+  // }
 
   void _startSOSHold() {
     _sosTimer?.cancel();
@@ -314,7 +397,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   void dispose() {
+    _positionSub?.cancel();
     _sosTimer?.cancel();
+    _sosAnimationController.dispose();
 
     _hoursController.dispose();
     _minutesController.dispose();

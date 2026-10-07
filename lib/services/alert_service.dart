@@ -1,7 +1,7 @@
 import '../core/api/api_client.dart';
 
 class AlertService {
-  /// Existing method — unchanged.
+  /// Trigger an SOS. Returns `{ alert: {...}, delivery: {...} }`.
   static Future<Map<String, dynamic>> triggerSOS({
     required String triggerType,
     Map<String, dynamic>? location,
@@ -16,18 +16,25 @@ class AlertService {
     );
   }
 
-  /// NEW — fetch current alert state (poll target).
-  ///
-  /// TODO: confirm endpoint with React parent.
-  /// Common patterns: GET /alerts/:id  or  GET /alerts/:id/status
-  static Future<Map<String, dynamic>> getAlertStatus(String alertId) async {
-    return await ApiClient.request('/alerts/$alertId');
+  /// Push the current GPS fix to the backend (called every 10s during an alert).
+  static Future<void> pushLocation({
+    required String alertId,
+    required double lat,
+    required double lng,
+    double? accuracy,
+  }) async {
+    await ApiClient.request(
+      '/alerts/$alertId/location',
+      method: 'POST',
+      body: {
+        'lat': lat,
+        'lng': lng,
+        if (accuracy != null) 'accuracy': accuracy,
+      },
+    );
   }
 
-  /// NEW — resolve / end the emergency.
-  ///
-  /// TODO: confirm endpoint with React parent.
-  /// Common patterns: POST /alerts/:id/resolve  or  PATCH /alerts/:id
+  /// End the emergency. Returns `{ alert: {...} }`.
   static Future<Map<String, dynamic>> resolveAlert(String alertId) async {
     return await ApiClient.request(
       '/alerts/$alertId/resolve',
@@ -35,4 +42,15 @@ class AlertService {
       body: const {},
     );
   }
+
+  /// Fetch any alert that's still active (called on app start).
+  static Future<Map<String, dynamic>> fetchActiveAlert() async {
+    return await ApiClient.request('/alerts/active');
+  }
+
+  // ─── NOTE ─────────────────────────────────────────────────────────────
+  // Audio upload (`POST /upload/audio/:alertId`) is multipart, so it needs
+  // a separate helper on ApiClient that supports form-data. Add that when
+  // you wire up audio recording.
+  // ──────────────────────────────────────────────────────────────────────
 }
