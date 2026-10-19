@@ -769,4 +769,8 @@ class _PulseDotState extends State<_PulseDot>
       ),
     );
   }
+
+  // static Future<Map<String, dynamic>> fetchActiveAlert() async {
+  //   return await ApiClient.request('/alerts/active');
+  // }
 }

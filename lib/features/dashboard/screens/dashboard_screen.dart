@@ -13,6 +13,8 @@ import 'active_alert_screen.dart';
 
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../services/offline_sos_service.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
@@ -116,12 +118,29 @@ class _DashboardScreenState extends State<DashboardScreen>
     } catch (e) {
       debugPrint('SOS ERROR: $e');
 
+      // Network failure → fall back to offline SMS
+      final offlineSent = await OfflineSosService.sendOfflineSos(
+        contacts: widget.contacts,
+        userName: 'SafeTrack user', // TODO: fetch real user name from storage
+        position: _currentPosition,
+        customMessage: null, // TODO: pull from settings
+      );
+
+      await OfflineSosService.queuePendingSos(
+        triggerType: triggerType,
+        location: _currentPosition,
+      );
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to trigger SOS: $e'),
-          duration: const Duration(seconds: 3),
+          content: Text(
+            offlineSent
+                ? 'Offline — your SOS is queued and will retry when you reconnect.'
+                : 'Offline and no contacts stored on this device.',
+          ),
+          duration: const Duration(seconds: 6),
         ),
       );
     }

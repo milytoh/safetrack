@@ -45,4 +45,15 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
+    <!-- Required on Android 11+ so url_launcher can open the SMS app -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="sms" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+    </queries>
 </manifest>
